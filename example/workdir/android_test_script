@@ -1,0 +1,2 @@
+# prepare test environment
+adb push ./assets/ /data/local/tmp/

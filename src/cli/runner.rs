@@ -61,9 +61,12 @@ pub fn run(args: Vec<String>) -> anyhow::Result<()> {
         }
     };
 
+    let working_dir = "/data/local/tmp";
+
     // Push binary to device
     let device_path = format!(
-        "/data/local/tmp/{}",
+        "{}/{}",
+        working_dir,
         args.executable.file_name().unwrap().to_string_lossy()
     );
 
@@ -119,6 +122,9 @@ pub fn run(args: Vec<String>) -> anyhow::Result<()> {
     let run_status = Command::new(&adb_path)
         .with_serial(adb_serial)
         .arg("shell")
+        .arg("cd")
+        .arg(working_dir)
+        .arg("&&")
         .arg(&device_path)
         .arg(verbosity_arg)
         .args(&args.runner_args)
