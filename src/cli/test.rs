@@ -168,7 +168,7 @@ pub fn run(args: Vec<String>) -> anyhow::Result<()> {
         test_cmd.arg("--manifest-path").arg(manifest_path);
     }
 
-    test_cmd.status().unwrap();
+    let test_status = test_cmd.status()?;
 
-    std::process::exit(0);
+    std::process::exit(test_status.code().unwrap_or(1))
 }
