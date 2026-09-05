@@ -8,8 +8,8 @@ mod tests {
 
     #[test]
     fn test_read_file() {
-        let content = fs::read_to_string("test.txt")
-            .expect("Cannot read test.txt, please check if it exist");
+        let content =
+            fs::read_to_string("test.txt").expect("Cannot read test.txt, please check if it exist");
         println!("{}", content);
     }
 }

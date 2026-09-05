@@ -1,4 +1,7 @@
-use std::{path::PathBuf, process::Command};
+use std::{
+    path::{Component, PathBuf},
+    process::Command,
+};
 
 use clap::Parser;
 
@@ -33,6 +36,17 @@ struct RunnerArgs {
     runner_args: Vec<String>,
 }
 
+fn prepend_path(prefix: &PathBuf, path: &PathBuf) -> PathBuf {
+    let mut result = prefix.clone();
+    for component in path.components() {
+        match component {
+            Component::RootDir | Component::Prefix(_) => continue,
+            _ => result.push(component.as_os_str()),
+        }
+    }
+    result
+}
+
 pub fn run(args: Vec<String>) -> anyhow::Result<()> {
     let mut shell = Shell::new();
 
@@ -61,22 +75,38 @@ pub fn run(args: Vec<String>) -> anyhow::Result<()> {
         }
     };
 
-    let working_dir = "/data/local/tmp";
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| std::env::current_dir().unwrap());
+
+    let device_root = PathBuf::from("/data/local/tmp");
+    let device_project_path = prepend_path(&device_root, &manifest_dir);
+
+    let mkdir_status = Command::new(&adb_path)
+        .with_serial(adb_serial)
+        .arg("shell")
+        .arg("mkdir")
+        .arg("-p")
+        .arg(&device_project_path)
+        .output()?;
+
+    if !mkdir_status.status.success() {
+        shell.error("Failed to create directory on device")?;
+        eprintln!("{}", std::str::from_utf8(&mkdir_status.stderr)?.trim());
+        std::process::exit(mkdir_status.status.code().unwrap_or(1));
+    }
 
     // Push binary to device
-    let device_path = format!(
-        "{}/{}",
-        working_dir,
-        args.executable.file_name().unwrap().to_string_lossy()
-    );
+    let device_bin_path = prepend_path(&device_project_path, &args.executable);
 
     // Ugly but works
     shell.verbose(|shell| {
         shell.status_header("Pushing")?;
         shell.reset_err()?;
-        shell
-            .err()
-            .write_fmt(format_args!("binary to device: {device_path}\r"))?;
+        shell.err().write_fmt(format_args!(
+            "binary to device: {}\r",
+            device_bin_path.display()
+        ))?;
         shell.set_needs_clear(true);
         Ok(())
     })?;
@@ -85,7 +115,7 @@ pub fn run(args: Vec<String>) -> anyhow::Result<()> {
         .with_serial(adb_serial)
         .arg("push")
         .arg(&args.executable)
-        .arg(&device_path)
+        .arg(&device_bin_path)
         .output()?;
 
     if !push_status.status.success() {
@@ -96,7 +126,12 @@ pub fn run(args: Vec<String>) -> anyhow::Result<()> {
         std::process::exit(push_status.status.code().unwrap_or(1));
     }
 
-    shell.verbose(|shell| shell.status("Pushing", format!("binary to device ({device_path})")))?;
+    shell.verbose(|shell| {
+        shell.status(
+            "Pushing",
+            format!("binary to device ({})", device_bin_path.display()),
+        )
+    })?;
 
     // Make binary executable
     let chmod_status = Command::new(&adb_path)
@@ -104,7 +139,7 @@ pub fn run(args: Vec<String>) -> anyhow::Result<()> {
         .arg("shell")
         .arg("chmod")
         .arg("755")
-        .arg(&device_path)
+        .arg(&device_bin_path)
         .status()?;
 
     if !chmod_status.success() {
@@ -123,9 +158,9 @@ pub fn run(args: Vec<String>) -> anyhow::Result<()> {
         .with_serial(adb_serial)
         .arg("shell")
         .arg("cd")
-        .arg(working_dir)
+        .arg(&device_project_path)
         .arg("&&")
-        .arg(&device_path)
+        .arg(&device_bin_path)
         .arg(verbosity_arg)
         .args(&args.runner_args)
         .status()?;
@@ -135,7 +170,7 @@ pub fn run(args: Vec<String>) -> anyhow::Result<()> {
         .with_serial(adb_serial)
         .arg("shell")
         .arg("rm")
-        .arg(&device_path)
+        .arg(&device_bin_path)
         .status();
 
     std::process::exit(run_status.code().unwrap_or(1))

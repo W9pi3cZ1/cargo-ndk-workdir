@@ -1,2 +1,2 @@
 # prepare test environment
-adb push ./assets/ /data/local/tmp/
+adb push ./assets/ /data/local/tmp$PWD/
