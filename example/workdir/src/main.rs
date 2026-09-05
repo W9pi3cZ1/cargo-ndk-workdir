@@ -5,11 +5,13 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::env;
 
     #[test]
     fn test_read_file() {
+        println!("PWD: {}", env::current_dir().unwrap().display());
         let content =
-            fs::read_to_string("test.txt").expect("Cannot read test.txt, please check if it exist");
+            fs::read_to_string("assets/test.txt").expect("Cannot read assets/test.txt, please check if it exist");
         println!("{}", content);
     }
 }

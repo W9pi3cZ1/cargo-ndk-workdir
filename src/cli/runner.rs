@@ -97,7 +97,7 @@ pub fn run(args: Vec<String>) -> anyhow::Result<()> {
     }
 
     // Push binary to device
-    let device_bin_path = prepend_path(&device_project_path, &args.executable);
+    let device_bin_path = prepend_path(&device_root, &args.executable);
 
     // Ugly but works
     shell.verbose(|shell| {
